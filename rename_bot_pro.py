@@ -1494,8 +1494,30 @@ async def broadcast_cmd(client, message: Message):
 
 
 # ───────────────────────────── STARTUP ─────────────────────────────
+async def start_health_server():
+    """Tiny HTTP responder so hosts that need an open port (Render Web Service) keep the bot alive."""
+    port = os.environ.get("PORT")
+    if not port:
+        return None
+
+    async def handle(reader, writer):
+        try:
+            await reader.read(1024)
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
+            await writer.drain()
+        except Exception:
+            pass
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(handle, "0.0.0.0", int(port))
+    print(f"Health server listening on port {port}")
+    return server
+
+
 async def main():
     global BOT_USERNAME
+    await start_health_server()
     await app.start()
     BOT_USERNAME = (await app.get_me()).username
     try:
